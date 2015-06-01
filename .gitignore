@@ -118,4 +118,5 @@ doc/build
 .DS_Store
 *.rej
 *~
+galaxylog.txt
 
