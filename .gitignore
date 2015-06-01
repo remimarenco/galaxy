@@ -63,6 +63,14 @@ object_store_conf.xml
 job_metrics_conf.xml
 workflow_schedulers_conf.xml
 config/*
+
+##JsCoverageQc not ignored
+!config/plugins
+config/plugins/*
+!config/plugins/visualizations
+config/plugins/visualizations/*
+!config/plugins/visualizations/jscoverageqc
+
 static/welcome.html.*
 static/welcome.html
 
