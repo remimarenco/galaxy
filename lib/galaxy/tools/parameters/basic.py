@@ -158,7 +158,10 @@ class ToolParameter( object, Dictifiable ):
 
     def value_to_basic( self, value, app ):
         if isinstance( value, RuntimeValue ):
-            return { "__class__": "RuntimeValue" }
+            return { '__class__': 'RuntimeValue' }
+        elif isinstance( value, dict ):
+            if value.get('__class__') == 'RuntimeValue':
+                return value
         return self.to_string( value, app )
 
     def value_from_basic( self, value, app, ignore_errors=False ):
@@ -631,7 +634,7 @@ class FTPFileToolParameter( ToolParameter ):
             value = [ value ]
         lst = []
         for val in value:
-            if val is None:
+            if val in [ None, '' ]:
                 lst = []
                 break
             if isinstance( val, dict ):
@@ -1678,7 +1681,7 @@ class BaseDataToolParameter( ToolParameter ):
         class_name = self.__class__.__name__
         assert trans is not None, "%s requires a trans" % class_name
         if history is None:
-            history = trans.get_history( create=True )
+            history = trans.get_history()
         assert history is not None, "%s requires a history" % class_name
         return history
 
@@ -2117,7 +2120,12 @@ class DataToolParameter( BaseDataToolParameter ):
     def to_dict( self, trans, view='collection', value_mapper=None, other_values=None ):
         # create dictionary and fill default parameters
         d = super( DataToolParameter, self ).to_dict( trans )
-        d['extensions'] = self.extensions
+        extensions = self.extensions
+        all_edam_formats = self._datatypes_registery( trans, self.tool ).edam_formats
+        edam_formats = map(lambda ext: all_edam_formats.get(ext, None),
+                           extensions)
+        d['extensions'] = extensions
+        d['edam_formats'] = edam_formats
         d['multiple'] = self.multiple
         d['options'] = {'hda': [], 'hdca': []}
 
