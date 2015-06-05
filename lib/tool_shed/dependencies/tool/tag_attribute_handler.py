@@ -12,6 +12,13 @@ class TagAttributeHandler( object ):
         self.rdd = rdd
         self.unpopulate = unpopulate
 
+    def __errorMessageDoNotExists( self, error_message, message ):
+        # Private function to check if the error_message is not empty and
+        # not already in message
+        if error_message and error_message not in message:
+            return True
+        return False
+
     def process_action_tag_set( self, elem, message ):
         # Here we're inside of an <actions> tag set.  See http://localhost:9009/view/devteam/package_r_2_11_0 .
         # <action>
@@ -30,7 +37,7 @@ class TagAttributeHandler( object ):
                                                      elem_index=sub_index,
                                                      elem=sub_elem,
                                                      message=message )
-            if error_message and error_message not in message:
+            if self.__errorMessageDoNotExists():
                 message += error_message
             if altered:
                 if not self.altered:
@@ -68,7 +75,7 @@ class TagAttributeHandler( object ):
                 altered, new_sub_elem, error_message = self.rdd.handle_sub_elem( parent_elem=elem,
                                                                                  elem_index=sub_index,
                                                                                  elem=sub_elem )
-            if error_message and error_message not in message:
+            if self.__errorMessageDoNotExists():
                 message += error_message
             if altered:
                 if not self.altered:
@@ -98,7 +105,7 @@ class TagAttributeHandler( object ):
                 altered, new_sub_elem, error_message = \
                     self.process_actions_tag_set( elem=sub_elem,
                                                   message=message )
-            if error_message and error_message not in message:
+            if self.__errorMessageDoNotExists():
                 message += error_message
             if altered:
                 if not self.altered:
@@ -107,7 +114,7 @@ class TagAttributeHandler( object ):
                     elem_altered = True
                 new_elem[ sub_index ] = new_sub_elem
         return elem_altered, new_elem, message
-        
+
     def process_config( self, root ):
         error_message = ''
         new_root = copy.deepcopy( root )
@@ -150,7 +157,7 @@ class TagAttributeHandler( object ):
                     ( str( package_version ), str( package_name ) )
                 error_message += 'the recipe for installing the package is missing either an '
                 error_message += '&lt;actions&gt; tag set or an &lt;actions_group&gt; tag set.'
-            if error_message and error_message not in message:
+            if self.__errorMessageDoNotExists():
                 message += error_message
             if altered:
                 if not self.altered:
@@ -176,7 +183,7 @@ class TagAttributeHandler( object ):
                                                      elem_index=sub_index,
                                                      elem=sub_elem,
                                                      message=message )
-            if error_message and error_message not in message:
+            if self.__errorMessageDoNotExists():
                 message += error_message
             if altered:
                 if not self.altered:
@@ -191,7 +198,7 @@ class TagAttributeHandler( object ):
         altered, new_elem, error_message = self.rdd.handle_complex_dependency_elem( parent_elem=parent_elem,
                                                                                     elem_index=elem_index,
                                                                                     elem=elem )
-        if error_message and error_message not in message:
+        if self.__errorMessageDoNotExists():
             message += error_message
         if altered:
             if not self.altered:
