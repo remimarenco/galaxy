@@ -87,7 +87,7 @@ ${h.js( 'libs/jquery/jquery',
                 $( '#vcfFile' ).replaceWith([
                     new DATASET_CHOICE.DatasetChoice({
                         datasetJSON : datasetJSON,
-                        label       : 'Input datasets',
+                        label       : 'Vcf Dataset',
                         selected    : [ ]
                     }).render().$el
                 ]);
@@ -95,7 +95,7 @@ ${h.js( 'libs/jquery/jquery',
                 $( '#exonFile' ).replaceWith([
                     new DATASET_CHOICE.DatasetChoice({
                         datasetJSON : datasetJSON,
-                        label       : 'Input datasets',
+                        label       : 'Exon dataset',
                         selected    : [ ]
                     }).render().$el
                 ]);
@@ -103,7 +103,7 @@ ${h.js( 'libs/jquery/jquery',
                 $( '#ampliconFile' ).replaceWith([
                     new DATASET_CHOICE.DatasetChoice({
                         datasetJSON : datasetJSON,
-                        label       : 'Input datasets',
+                        label       : 'Amplicon dataset',
                         selected    : [ ]
                     }).render().$el
                 ]);
@@ -111,7 +111,7 @@ ${h.js( 'libs/jquery/jquery',
                 $( '#variantTsv' ).replaceWith([
                     new DATASET_CHOICE.DatasetChoice({
                         datasetJSON : datasetJSON,
-                        label       : 'Input datasets',
+                        label       : 'Variant dataset',
                         selected    : [ ]
                     }).render().$el
                 ]);
@@ -119,7 +119,7 @@ ${h.js( 'libs/jquery/jquery',
                 $( '#doNotCallFile' ).replaceWith([
                     new DATASET_CHOICE.DatasetChoice({
                         datasetJSON : datasetJSON,
-                        label       : 'Input datasets',
+                        label       : 'DoNotCall dataset',
                         selected    : [ ]
                     }).render().$el
                 ]);
