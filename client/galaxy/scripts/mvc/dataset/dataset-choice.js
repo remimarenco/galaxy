@@ -257,6 +257,7 @@ var DatasetChoice = Backbone.View.extend( BASE_MVC.LoggableMixin ).extend({
 
     /** return jQ DOM for the selected dataset (only one) */
     _renderSelected : function( json ){
+        debugger;
         if( json.selected.length ){
 //TODO: break out?
             return $( _.template([

@@ -84,45 +84,50 @@ ${h.js( 'libs/jquery/jquery',
 
             datasetFetch.done( function( datasetJSON ){
                 // Replace the HTML5 inputs by DatasetChoices
-                $( '#vcfFile' ).replaceWith([
-                    new DATASET_CHOICE.DatasetChoice({
+
+                var vcfGalaxyInput = new DATASET_CHOICE.DatasetChoice({
                         datasetJSON : datasetJSON,
                         label       : 'Vcf Dataset',
                         selected    : [ ]
-                    }).render().$el
+                    });
+                vcfGalaxyInput.on( 'selected', function( chooser, json ){
+                    debugger;
+                });
+                $( '#vcfFile' ).replaceWith([
+                    vcfGalaxyInput.render().$el
                 ]);
 
-                $( '#exonFile' ).replaceWith([
+                $( '#exonFile' ).replaceWith(
                     new DATASET_CHOICE.DatasetChoice({
                         datasetJSON : datasetJSON,
                         label       : 'Exon dataset',
                         selected    : [ ]
-                    }).render().$el
-                ]);
+                    }, { where : { extension: 'bed' }}).render().$el
+                );
 
-                $( '#ampliconFile' ).replaceWith([
+                $( '#ampliconFile' ).replaceWith(
                     new DATASET_CHOICE.DatasetChoice({
                         datasetJSON : datasetJSON,
                         label       : 'Amplicon dataset',
                         selected    : [ ]
                     }).render().$el
-                ]);
+                );
 
-                $( '#variantTsv' ).replaceWith([
+                $( '#variantTsv' ).replaceWith(
                     new DATASET_CHOICE.DatasetChoice({
                         datasetJSON : datasetJSON,
                         label       : 'Variant dataset',
                         selected    : [ ]
                     }).render().$el
-                ]);
+                );
 
-                $( '#doNotCallFile' ).replaceWith([
+                $( '#doNotCallFile' ).replaceWith(
                     new DATASET_CHOICE.DatasetChoice({
                         datasetJSON : datasetJSON,
                         label       : 'DoNotCall dataset',
                         selected    : [ ]
                     }).render().$el
-                ]);
+                );
             });
 
         });
