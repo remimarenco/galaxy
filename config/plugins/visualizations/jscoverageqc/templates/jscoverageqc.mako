@@ -48,17 +48,15 @@ ${h.js( 'libs/jquery/jquery',
     <div id="content">
       <h1>If you can see this, something is broken (or JS is not enabled)!!.</h1>
     </div>
-    <ul id="reads">
-        %for read in hda.datatype.dataprovider( hda, 'dataset-dict', limit=10 ):
-            <li>${read['Chrom']}</li>
-        %endfor
-        <p id="paragraph"></p>
-    </ul>
+
     <script>
     /* jshint ignore:start */
       __REACT_DEVTOOLS_GLOBAL_HOOK__ = parent.__REACT_DEVTOOLS_GLOBAL_HOOK__;
     /* jshint ignore:end */
     </script>
+
+    ${h.javascript_link( root + 'plugins/visualizations/jscoverageqc/static/assets/main.js' )}
+
     <script type="text/javascript">
         // Declare all the files here
         require.config({
@@ -83,19 +81,52 @@ ${h.js( 'libs/jquery/jquery',
         $(function(){
             var datasetFetch = jQuery.ajax( '/api/histories/' +
                 '${ trans.security.encode_id( trans.history.id ) }/contents?details=all' );
+
             datasetFetch.done( function( datasetJSON ){
-                $( 'body' ).append([
+                // Replace the HTML5 inputs by DatasetChoices
+                $( '#vcfFile' ).replaceWith([
                     new DATASET_CHOICE.DatasetChoice({
                         datasetJSON : datasetJSON,
                         label       : 'Input datasets',
-                        selected    : [ dataset_id ]
+                        selected    : [ ]
+                    }).render().$el
+                ]);
+
+                $( '#exonFile' ).replaceWith([
+                    new DATASET_CHOICE.DatasetChoice({
+                        datasetJSON : datasetJSON,
+                        label       : 'Input datasets',
+                        selected    : [ ]
+                    }).render().$el
+                ]);
+
+                $( '#ampliconFile' ).replaceWith([
+                    new DATASET_CHOICE.DatasetChoice({
+                        datasetJSON : datasetJSON,
+                        label       : 'Input datasets',
+                        selected    : [ ]
+                    }).render().$el
+                ]);
+
+                $( '#variantTsv' ).replaceWith([
+                    new DATASET_CHOICE.DatasetChoice({
+                        datasetJSON : datasetJSON,
+                        label       : 'Input datasets',
+                        selected    : [ ]
+                    }).render().$el
+                ]);
+
+                $( '#doNotCallFile' ).replaceWith([
+                    new DATASET_CHOICE.DatasetChoice({
+                        datasetJSON : datasetJSON,
+                        label       : 'Input datasets',
+                        selected    : [ ]
                     }).render().$el
                 ]);
             });
+
         });
     });
     </script>
-
-    ${h.javascript_link( root + 'plugins/visualizations/jscoverageqc/static/assets/main.js' )}
 
 </body>
