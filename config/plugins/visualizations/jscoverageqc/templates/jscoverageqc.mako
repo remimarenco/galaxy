@@ -58,9 +58,7 @@ ${h.js( 'libs/jquery/jquery',
     ${h.javascript_link( root + 'plugins/visualizations/jscoverageqc/static/assets/main.js' )}
 
     <script type="text/javascript">
-    var toto = function(){
-        launchApp();
-    };
+    launchApp();
     // Declare all the files here
     require.config({
         baseUrl: "/static/scripts"
