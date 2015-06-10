@@ -40,6 +40,9 @@ ${h.js( 'libs/jquery/jquery',
 )}
 <script type="text/javascript" src="https://www.google.com/jsapi"></script>
 <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.21.5/js/jquery.tablesorter.min.js"></script>
+<script type="text/javascript"
+        src="https://www.google.com/jsapi?autoload={'modules':[{'name':'visualization','version':'1','packages':['corechart']}]}">
+        </script>
 
 </head>
 
@@ -58,7 +61,6 @@ ${h.js( 'libs/jquery/jquery',
     ${h.javascript_link( root + 'plugins/visualizations/jscoverageqc/static/assets/main.js' )}
 
     <script type="text/javascript">
-    launchApp();
     // Declare all the files here
     require.config({
         baseUrl: "/static/scripts"
@@ -78,8 +80,6 @@ ${h.js( 'libs/jquery/jquery',
                         label       : 'Vcf Dataset',
                         selected    : [ ]
                     });
-                $( 'body' ).append(vcfGalaxyInput.render().$el);
-                vcfGalaxyInput.on('selected', toto);
                 // Bed Exon input
                 var exonGalaxyInput = new DATASET_CHOICE.DatasetChoice({
                     datasetJSON : datasetJSON,
@@ -100,7 +100,7 @@ ${h.js( 'libs/jquery/jquery',
                 });
                 // We launch the app with the inputs
                 // TODO: Put a parameter name for each one
-                //launchApp();
+                launchApp();
             });
         });
     });
