@@ -136,11 +136,19 @@ ${h.js( 'libs/jquery/jquery',
                             variant : variantResponse[0]
                         };
                         // !! ... do something with the data + your app
-                        launchApp();
-                        console.debug( filedata.vcf );
+                        var myGalaxyParameters = {
+                            needHtml5Upload: false,
+                            vcfGalaxyResult: filedata.vcf,
+                            exonGalaxyResult: filedata.exon,
+                            ampliconGalaxyResult: filedata.amplicon,
+                            variantGalaxyResult: filedata.variant
+                        };
+                        launchApp( myGalaxyParameters );
+                        /*console.debug( filedata.vcf );
                         console.debug( filedata.exon );
                         console.debug( filedata.amplicon );
                         console.debug( filedata.variant );
+                        */
                     });
                     // .fail( function(){ /* handle errors */ })
                 }
