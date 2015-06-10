@@ -100,7 +100,9 @@ ${h.js( 'libs/jquery/jquery',
                 });
                 // We launch the app with the inputs
                 // TODO: Put a parameter name for each one
-                launchApp();
+                console.log(vcfGalaxyInput);
+                debugger;
+                launchApp(vcfGalaxyInput);
             });
         });
     });
