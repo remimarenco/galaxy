@@ -38,6 +38,8 @@ ${h.js( 'libs/jquery/jquery',
         'libs/require',
         ## 'mvc/ui'
 )}
+
+<link rel="stylesheet" href="//code.jquery.com/ui/1.11.4/themes/smoothness/jquery-ui.css">
 <script type="text/javascript" src="https://www.google.com/jsapi"></script>
 <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.21.5/js/jquery.tablesorter.min.js"></script>
 <script type="text/javascript"
