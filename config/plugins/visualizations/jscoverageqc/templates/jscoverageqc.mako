@@ -50,6 +50,8 @@ ${h.js( 'libs/jquery/jquery',
 
 ## ----------------------------------------------------------------------------
 <body>
+    <div><h1>Js Coverage QC</h1></div>
+
     <div id="data-controls">
         <button id="process" disabled>Process</button>
     </div>
