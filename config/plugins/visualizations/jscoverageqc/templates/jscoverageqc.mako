@@ -52,7 +52,6 @@ ${h.js( 'libs/jquery/jquery',
         <button id="process" disabled>Process</button>
     </div>
     <div id="content">
-      <h1>If you can see this, something is broken (or JS is not enabled)!!.</h1>
     </div>
 
     <script>
