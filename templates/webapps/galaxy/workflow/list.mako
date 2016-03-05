@@ -49,6 +49,9 @@
                     <tr class="header">
                         <th>Name</th>
                         <th># of Steps</th>
+                        <th>Published</td>
+                        <th>Created</th>
+                        <th>Last Updated</th>
                         ## <th>Last Updated</th>
                         <th></th>
                     </tr>
@@ -59,7 +62,11 @@
                                 ${h.to_unicode( workflow.name ) | h}
                                 </div>
                             </td>
-                            <td>${len(workflow.latest_workflow.steps)}</td>
+                            <td>${len( workflow.latest_workflow.steps )}</td>
+                            <td>${workflow.published}</td>
+                            <!-- TODO: Modify time display to be at user time -->
+                            <td>${workflow.create_time.strftime( '%Y/%m/%d %H:%M' )}</td>
+                            <td>${workflow.update_time.strftime( '%Y/%m/%d %H:%M' )}</td>
                             ## <td>${str(workflow.update_time)[:19]}</td>
                             <td>
                                 <div popupmenu="wf-${i}-popup">
