@@ -112,4 +112,8 @@
     <tool file="plotting/boxplot.xml" />
     <tool file="maf/vcf_to_maf_customtrack.xml" />
   </section>
+  <section id="hubAssembly" name="GOnRamp">
+    <tool file="hub_assembly/hubArchiveCreator.xml" />
+    <tool file="dummy/dummy.xml" />
+  </section>
 </toolbox>

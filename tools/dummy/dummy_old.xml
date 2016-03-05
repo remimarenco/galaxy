@@ -1,0 +1,11 @@
+<tool id="dummy" name="Dummy file" version="0.0.0">
+    <description>
+        Dummy test python
+    </description>
+    <command><![CDATA[
+        python dummy.py --outdir $output.files_path
+    ]]></command>
+    <outputs>
+        <data format="html" name="output" />
+    </outputs>
+</tool>
