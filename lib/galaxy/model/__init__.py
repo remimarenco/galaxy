@@ -17,17 +17,13 @@ from datetime import datetime, timedelta
 from itertools import ifilter, imap
 from string import Template
 from uuid import UUID, uuid4
+from six import string_types
 
 from sqlalchemy import and_, func, not_, or_, true, join, select
 from sqlalchemy.orm import joinedload, object_session, aliased
 from sqlalchemy.ext import hybrid
 from sqlalchemy import types
 from sqlalchemy import type_coerce
-
-try:
-    import pexpect
-except ImportError:
-    pexpect = None
 
 import galaxy.model.orm.now
 import galaxy.model.metadata
@@ -37,10 +33,11 @@ from galaxy.model.item_attrs import UsesAnnotations
 from galaxy.util.dictifiable import Dictifiable
 from galaxy.security import get_permitted_actions
 from galaxy.util import Params, restore_text, send_mail
-from galaxy.util.multi_byte import is_multi_byte
 from galaxy.util import ready_name_for_url, unique_id
-from galaxy.util.bunch import Bunch
+from galaxy.util import unicodify
+from galaxy.util.multi_byte import is_multi_byte
 from galaxy.util.hash_util import new_secure_hash
+from galaxy.util.bunch import Bunch
 from galaxy.util.directory_hash import directory_hash_id
 from galaxy.util.sanitize_html import sanitize_html
 from galaxy.web.framework.helpers import to_unicode
@@ -57,9 +54,6 @@ _datatypes_registry = None
 # are going to have different limits so it is likely best to not let
 # this be unlimited - filter in Python if over this limit.
 MAX_IN_FILTER_LENGTH = 100
-
-PEXPECT_IMPORT_MESSAGE = ('The Python pexpect package is required to use this '
-                          'feature, please install it')
 
 
 class NoConverterException(Exception):
@@ -100,8 +94,7 @@ class HasName:
         object. If string, convert to unicode object assuming 'utf-8' format.
         """
         name = self.name
-        if isinstance(name, str):
-            name = unicode(name, 'utf-8')
+        name = unicodify( name, 'utf-8' )
         return name
 
 
@@ -112,18 +105,13 @@ class JobLike:
         self.numeric_metrics = []
 
     def add_metric( self, plugin, metric_name, metric_value ):
-        if isinstance( plugin, str ):
-            plugin = unicode( plugin, 'utf-8' )
-
-        if isinstance( metric_name, str ):
-            metric_name = unicode( metric_name, 'utf-8' )
-
+        plugin = unicodify( plugin, 'utf-8' )
+        metric_name = unicodify( metric_name, 'utf-8' )
         if isinstance( metric_value, numbers.Number ):
             metric = self._numeric_metric( plugin, metric_name, metric_value )
             self.numeric_metrics.append( metric )
         else:
-            if isinstance( metric_value, str ):
-                metric_value = unicode( metric_value, 'utf-8' )
+            metric_value = unicodify( metric_value, 'utf-8' )
             if len( metric_value ) > 1022:
                 # Truncate these values - not needed with sqlite
                 # but other backends must need it.
@@ -147,6 +135,16 @@ class JobLike:
             stderr = galaxy.util.shrink_string_by_size( stderr, galaxy.util.DATABASE_MAX_STRING_SIZE, join_by="\n..\n", left_larger=True, beginning_on_size_error=True )
             log.info( "stderr for %s %d is greater than %s, only a portion will be logged to database", type(self), self.id, galaxy.util.DATABASE_MAX_STRING_SIZE_PRETTY )
         self.stderr = stderr
+
+    def log_str(self):
+        extra = ""
+        safe_id = getattr(self, "id", None)
+        if safe_id is not None:
+            extra += "id=%s" % safe_id
+        else:
+            extra += "unflushed"
+
+        return "%s[%s,tool_id=%s]" % (self.__class__.__name__, extra, self.tool_id)
 
 
 class User( object, Dictifiable ):
@@ -370,6 +368,15 @@ class Job( object, JobLike, Dictifiable ):
     terminal_states = [ states.OK,
                         states.ERROR,
                         states.DELETED ]
+    #: job states where the job hasn't finished and the model may still change
+    non_ready_states = [
+        states.NEW,
+        states.RESUBMITTED,
+        states.UPLOAD,
+        states.WAITING,
+        states.QUEUED,
+        states.RUNNING,
+    ]
 
     # Please include an accessor (get/set pair) for any new columns/members.
     def __init__( self ):
@@ -697,6 +704,18 @@ class Job( object, JobLike, Dictifiable ):
         self.set_state( final_state )
         if self.workflow_invocation_step:
             self.workflow_invocation_step.update()
+
+    def get_destination_configuration(self, config, key, default=None):
+        """ Get a destination parameter that can be defaulted back
+        in specified config if it needs to be applied globally.
+        """
+        param_unspecified = object()
+        config_value = (self.destination_params or {}).get(key, param_unspecified)
+        if config_value is param_unspecified:
+            config_value = getattr(config, key, param_unspecified)
+        if config_value is param_unspecified:
+            config_value = default
+        return config_value
 
 
 class Task( object, JobLike ):
@@ -1612,6 +1631,7 @@ class Dataset( StorableObject ):
     # failed_metadata is only valid as DatasetInstance state currently
 
     non_ready_states = (
+        states.NEW,
         states.UPLOAD,
         states.QUEUED,
         states.RUNNING,
@@ -2178,7 +2198,7 @@ class DatasetInstance( object ):
                 data_source = source_list
             else:
                 # Convert.
-                if isinstance( source_list, str ):
+                if isinstance( source_list, string_types ):
                     source_list = [ source_list ]
 
                 # Loop through sources until viable one is found.
@@ -2413,7 +2433,7 @@ class HistoryDatasetAssociation( DatasetInstance, Dictifiable, UsesAnnotations, 
                      update_time=hda.update_time.isoformat(),
                      data_type=hda.datatype.__class__.__module__ + '.' + hda.datatype.__class__.__name__,
                      genome_build=hda.dbkey,
-                     misc_info=hda.info.strip() if isinstance( hda.info, basestring ) else hda.info,
+                     misc_info=hda.info.strip() if isinstance( hda.info, string_types ) else hda.info,
                      misc_blurb=hda.blurb )
 
         # add tags string list
@@ -4624,30 +4644,6 @@ class Sample( object, Dictifiable ):
             if dataset.status != SampleDataset.transfer_status.COMPLETE:
                 untransferred_datasets.append( dataset )
         return untransferred_datasets
-
-    def get_untransferred_dataset_size( self, filepath, scp_configs ):
-        def print_ticks( d ):
-            pass
-        if pexpect is None:
-            return PEXPECT_IMPORT_MESSAGE
-        error_msg = 'Error encountered in determining the file size of %s on the external_service.' % filepath
-        if not scp_configs['host'] or not scp_configs['user_name'] or not scp_configs['password']:
-            return error_msg
-        login_str = '%s@%s' % ( scp_configs['user_name'], scp_configs['host'] )
-        cmd = 'ssh %s "du -sh \'%s\'"' % ( login_str, filepath )
-        try:
-            output = pexpect.run( cmd,
-                                  events={ '.ssword:*': scp_configs['password'] + '\r\n',
-                                           pexpect.TIMEOUT: print_ticks},
-                                  timeout=10 )
-        except Exception:
-            return error_msg
-        # cleanup the output to get just the file size
-        return output.replace( filepath, '' )\
-                     .replace( 'Password:', '' )\
-                     .replace( "'s password:", '' )\
-                     .replace( login_str, '' )\
-                     .strip()
 
     @property
     def run_details( self ):
