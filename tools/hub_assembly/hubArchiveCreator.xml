@@ -5,21 +5,9 @@
     </description>
 
     <requirements>
-        <requirement>
-            bedToBigBed
-        </requirement>
-        <requirement>
-            faToTwoBit
-        </requirement>
-        <requirement>
-            genePredToBed
-        </requirement>
-        <requirement>
-            gff3ToGenePred
-        </requirement>
-        <requirement>
-            twoBitInfo
-        </requirement>
+        <requirement type="package" version="312">ucsc_tools</requirement>
+        <requirement type="package" version="0.0.1">gff3ToGenePred</requirement>
+        <requirement type="package" version="0.0.1">genePredToBed</requirement>
     </requirements>
 
     <stdio>

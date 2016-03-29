@@ -3,7 +3,7 @@
 This Galaxy tool permits to prepare your files to be ready for
 Assembly Hub visualization.
 Program test arguments:
-hubArchiveCreator.py -g test-data/augustusDbia3.gff3 -f test-data/dbia3.fa -d . -o output.html
+hubArchiveCreator.py -g test-data/augustusDbia3.gff3 -f test-data/dbia3.fa -d . -u ./tools -o output.html
 """
 
 import sys
@@ -20,9 +20,7 @@ from mako.lookup import TemplateLookup
 # Internal dependencies
 from twoBitCreator import twoBitFileCreator
 
-# TODO: REMOVE THIS FROM BEING A GLOBAL VARIABLE
-toolDirectory = '.'
-extra_files_path = '.'
+#TODO: Verify each subprocessed dependency is accessible [gff3ToGenePred, genePredToBed, twoBitInfo, faToTwoBit, bedToBigBed, sort
 
 def main(argv):
     # Command Line parsing init
@@ -31,14 +29,16 @@ def main(argv):
     parser.add_argument('-g', '--gff3', help='Directory where to put the foo.txt')
     parser.add_argument('-f', '--fasta', help='Directory where to put the foo.txt')
     parser.add_argument('-d', '--directory', help='Directory where to put the foo.txt')
+    parser.add_argument('-u', '--ucsc_tools_path', help='Directory where to put the foo.txt')
     parser.add_argument('-e', '--extra_files_path', help='Directory where to put the foo.txt')
     parser.add_argument('-o', '--output', help='Directory where to put the foo.txt')
 
 
-    global toolDirectory
-    global extra_files_path
-    inputGFF3File = ''
-    inputFastaFile = ''
+    ucsc_tools_path = ''
+
+
+    toolDirectory = '.'
+    extra_files_path = '.'
 
     # Get the args passed in parameter
     args = parser.parse_args()
@@ -50,6 +50,8 @@ def main(argv):
         toolDirectory = args.directory
     if args.extra_files_path:
         extra_files_path = args.extra_files_path
+    if args.ucsc_tools_path:
+        ucsc_tools_path = args.ucsc_tools_path
 
     outputZip = zipfile.ZipFile(os.path.join(extra_files_path, 'myHub.zip'), 'w')
 
@@ -60,7 +62,7 @@ def main(argv):
     suffixTwoBit, extensionTwoBit = os.path.splitext(baseNameFasta)
     nameTwoBit = suffixTwoBit + '.2bit'
 
-    rootAssemblyHub = createAssemblyHub(outputZip, twoBitName=nameTwoBit)
+    rootAssemblyHub = createAssemblyHub(outputZip, twoBitName=nameTwoBit, toolDirectory=toolDirectory, extra_files_path=extra_files_path)
 
     # TODO: See if we need these temporary files as part of the generated files
     genePredFile = tempfile.NamedTemporaryFile(bufsize=0, suffix=".genePred")
@@ -71,7 +73,7 @@ def main(argv):
 
     # gff3ToGenePred processing
     p = subprocess.Popen(
-        [os.path.join(toolDirectory, 'tools/gff3ToGenePred'),
+        [os.path.join(ucsc_tools_path, 'gff3ToGenePred'),
             inputGFF3File.name,
             genePredFile.name])
     # We need to wait the time gff3ToGenePred terminate so genePredToBed can begin
@@ -80,7 +82,7 @@ def main(argv):
 
     # genePredToBed processing
     p = subprocess.Popen(
-        [os.path.join(toolDirectory, 'tools/genePredToBed'),
+        [os.path.join(ucsc_tools_path, 'genePredToBed'),
             genePredFile.name,
             unsortedBedFile.name])
     p.wait()
@@ -100,13 +102,13 @@ def main(argv):
     mySpecieFolderPath = os.path.join(extra_files_path, "myHub", "dbia3")
 
     # 2bit file creation from input fasta
-    twoBitFile = twoBitFileCreator(inputFastaFile, toolDirectory, mySpecieFolderPath)
+    twoBitFile = twoBitFileCreator(inputFastaFile, ucsc_tools_path, mySpecieFolderPath)
 
     # Generate the chrom.sizes
     # TODO: Isolate in a function
     # We first get the twoBit Infos
     p = subprocess.Popen(
-        [os.path.join(toolDirectory, 'tools/twoBitInfo'),
+        [os.path.join(ucsc_tools_path, 'twoBitInfo'),
             twoBitFile.name,
             'stdout'],
         stdout=subprocess.PIPE,
@@ -133,7 +135,7 @@ def main(argv):
     myBigBedFilePath = os.path.join(myTrackFolderPath, 'augustusDbia3.bb')
     with open(myBigBedFilePath, 'w') as bigBedFile:
         p = subprocess.Popen(
-            [os.path.join(toolDirectory, 'tools/bedToBigBed'),
+            [os.path.join(ucsc_tools_path, 'bedToBigBed'),
                 sortedBedFile.name,
                 chromSizesFile.name,
                 bigBedFile.name])
@@ -168,8 +170,7 @@ def main(argv):
 
     sys.exit(0)
 
-
-def createAssemblyHub(outputZip, twoBitName):
+def createAssemblyHub(outputZip, twoBitName, toolDirectory, extra_files_path):
     # TODO: Manage to put every fill Function in a file dedicated for reading reasons
     # Create the root directory
     myHubPath = os.path.join(extra_files_path, "myHub")
@@ -178,16 +179,16 @@ def createAssemblyHub(outputZip, twoBitName):
 
     # Add the genomes.txt file
     genomesTxtFilePath = os.path.join(myHubPath, 'genomes.txt')
-    fillGenomesTxt(genomesTxtFilePath, twoBitName)
+    fillGenomesTxt(genomesTxtFilePath, twoBitName, toolDirectory)
 
     # Add the hub.txt file
     hubTxtFilePath = os.path.join(myHubPath, 'hub.txt')
-    fillHubTxt(hubTxtFilePath)
+    fillHubTxt(hubTxtFilePath, toolDirectory)
 
     # Add the hub.html file
     # TODO: Change the name and get it depending on the specie
     hubHtmlFilePath = os.path.join(myHubPath, 'dbia.html')
-    fillHubHtmlFile(hubHtmlFilePath)
+    fillHubHtmlFile(hubHtmlFilePath, toolDirectory)
 
     # Create the specie folder
     # TODO: Generate the name depending on the specie
@@ -197,16 +198,16 @@ def createAssemblyHub(outputZip, twoBitName):
 
     # Create the trackDb.txt file in the specie folder
     trackDbTxtFilePath = os.path.join(mySpecieFolderPath, 'trackDb.txt')
-    fillTrackDbTxtFile(trackDbTxtFilePath)
+    fillTrackDbTxtFile(trackDbTxtFilePath, toolDirectory)
 
     # Create the description html file in the specie folder
     descriptionHtmlFilePath = os.path.join(mySpecieFolderPath, 'description.html')
-    fillDescriptionHtmlFile(descriptionHtmlFilePath)
+    fillDescriptionHtmlFile(descriptionHtmlFilePath, toolDirectory)
 
     # Create the file groups.txt
     # TODO: If not inputs for this, do no create the file
     groupsTxtFilePath = os.path.join(mySpecieFolderPath, 'groups.txt')
-    fillGroupsTxtFile(groupsTxtFilePath)
+    fillGroupsTxtFile(groupsTxtFilePath, toolDirectory)
 
     # Create the folder tracks into the specie folder
     tracksFolderPath = os.path.join(mySpecieFolderPath, "tracks")
@@ -215,8 +216,7 @@ def createAssemblyHub(outputZip, twoBitName):
 
     return myHubPath
 
-
-def fillGenomesTxt(genomesTxtFilePath, twoBitName):
+def fillGenomesTxt(genomesTxtFilePath, twoBitName, toolDirectory):
     # TODO: Think about the inputs and outputs
     # TODO: Manage the template of this file
     # renderer = pystache.Renderer(search_dirs="templates/genomesAssembly")
@@ -241,7 +241,7 @@ def fillGenomesTxt(genomesTxtFilePath, twoBitName):
         genomesTxtFile.write(htmlMakoRendered)
 
 
-def fillHubTxt(hubTxtFilePath):
+def fillHubTxt(hubTxtFilePath, toolDirectory):
     # TODO: Think about the inputs and outputs
     # TODO: Manage the template of this file
     mylookup = TemplateLookup(directories=[os.path.join(toolDirectory, 'templates/hubTxt')], output_encoding='utf-8', encoding_errors='replace')
@@ -259,7 +259,7 @@ def fillHubTxt(hubTxtFilePath):
         genomesTxtFile.write(htmlMakoRendered)
 
 
-def fillHubHtmlFile(hubHtmlFilePath):
+def fillHubHtmlFile(hubHtmlFilePath, toolDirectory):
     # TODO: Think about the inputs and outputs
     # TODO: Manage the template of this file
     # renderer = pystache.Renderer(search_dirs="templates/hubDescription")
@@ -286,7 +286,7 @@ def fillHubHtmlFile(hubHtmlFilePath):
         hubHtmlFile.write(htmlMakoRendered)
 
 
-def fillTrackDbTxtFile(trackDbTxtFilePath):
+def fillTrackDbTxtFile(trackDbTxtFilePath, toolDirectory):
     # TODO: Modify according to the files passed in parameter
     mylookup = TemplateLookup(directories=[os.path.join(toolDirectory, 'templates/trackDb')], output_encoding='utf-8', encoding_errors='replace')
     mytemplate = mylookup.get_template("layout.txt")
@@ -302,7 +302,7 @@ def fillTrackDbTxtFile(trackDbTxtFilePath):
         trackDbFile.write(htmlMakoRendered)
 
 
-def fillDescriptionHtmlFile(descriptionHtmlFilePath):
+def fillDescriptionHtmlFile(descriptionHtmlFilePath, toolDirectory):
     # TODO: Think about the inputs and outputs
     # TODO: Manage the template of this file
     mylookup = TemplateLookup(directories=[os.path.join(toolDirectory, 'templates/specieDescription')], output_encoding='utf-8', encoding_errors='replace')
@@ -315,7 +315,7 @@ def fillDescriptionHtmlFile(descriptionHtmlFilePath):
         descriptionHtmlFile.write(htmlMakoRendered)
 
 
-def fillGroupsTxtFile(groupsTxtFilePath):
+def fillGroupsTxtFile(groupsTxtFilePath, toolDirectory):
     mylookup = TemplateLookup(directories=[os.path.join(toolDirectory, 'templates/groupsTxt')], output_encoding='utf-8', encoding_errors='replace')
     mytemplate = mylookup.get_template("layout.txt")
     with open(groupsTxtFilePath, 'w') as groupsTxtFile:
