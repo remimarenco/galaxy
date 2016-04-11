@@ -48,6 +48,7 @@ Members
 - James Taylor (@jxtx)
 - Nitesh Turaga (@nitesh1989)
 - Marius van den Beek (@mvdbeek)
+- Rémi Marenco (@remimarenco)
 
 
 Membership
