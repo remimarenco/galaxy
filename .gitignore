@@ -129,3 +129,7 @@ doc/build
 .DS_Store
 *.rej
 *~
+
+# HubArchiveCreator Specific
+tools/hub_assembly
+tool_test_output.*
