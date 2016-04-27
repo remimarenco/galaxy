@@ -12,9 +12,8 @@
 
 @import "fontawesome/font-awesome.less";
 .fa-icon {
-  font-family: FontAwesome;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+    // TODO: remove fa-icon and replace with fa
+    .fa;
 }
 
 @import "select2.less";
@@ -430,6 +429,10 @@ div.unified-panel-body-background {
     .navbar-tabs {
         .toggle {
             color           : gold;
+        }
+        .dropdown-icon {
+            top             : 1px;
+            font-size       : 1.8em;
         }
         .dropdown-note {
             font-weight     : bold;

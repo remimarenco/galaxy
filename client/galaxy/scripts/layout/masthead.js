@@ -29,7 +29,6 @@ var View = Backbone.View.extend({
 
         // scratchbook
         Galaxy.frame = this.frame = new Scratchbook( { collection: this.collection } );
-        $( 'body' ).append( this.frame.$el );
 
         // set up the quota meter (And fetch the current user data from trans)
         // add quota meter to masthead
@@ -63,7 +62,7 @@ var View = Backbone.View.extend({
     render: function() {
         this.$navbarBrandTitle.html( 'Galaxy ' + ( this.options.brand && '/ ' + this.options.brand || '' ) );
         this.$navbarBrandLink.attr( 'href', this.options.logo_url );
-        this.$navbarBrandImage.attr( 'src', Galaxy.root + 'static/images/galaxyIcon_noText.png' );
+        this.$navbarBrandImage.attr( 'src', this.options.logo_src );
         this.quotaMeter.render();
         return this;
     },

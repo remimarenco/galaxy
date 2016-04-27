@@ -48,15 +48,15 @@ function sanitize(content) {
  * usually used for selectable options
  * @param{String}   value - Value or list to be validated
  */
-function validate (value) {
-    if (!(value instanceof Array)) {
-        value = [value];
+function validate ( value ) {
+    if ( !( value instanceof Array ) ) {
+        value = [ value ];
     }
-    if (value.length === 0) {
+    if ( value.length === 0 ) {
         return false;
     }
-    for (var i in value) {
-        if (['__null__', '__undefined__', null, undefined].indexOf(value[i]) > -1) {
+    for( var i in value ) {
+        if ( [ '__null__', '__undefined__', null, undefined ].indexOf( value[ i ] ) > -1 ) {
             return false;
         }
     }
@@ -67,13 +67,12 @@ function validate (value) {
  * Convert list to pretty string
  * @param{String}   lst - List of strings to be converted in human readable list sentence
  */
-function textify(lst) {
-    var lst = lst.toString();
-    if (lst) {
-        lst = lst.replace(/,/g, ', ');
-        var pos = lst.lastIndexOf(', ');
-        if (pos != -1) {
-            lst = lst.substr(0, pos) + ' or ' + lst.substr(pos+1);
+function textify( lst ) {
+    if ( $.isArray( lst ) ) {
+        var lst = lst.toString().replace( /,/g, ', ' );
+        var pos = lst.lastIndexOf( ', ' );
+        if ( pos != -1 ) {
+            lst = lst.substr( 0, pos ) + ' or ' + lst.substr( pos + 2 );
         }
         return lst;
     }

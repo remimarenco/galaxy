@@ -127,10 +127,16 @@ def clean_dependency_relationships(trans, metadata_dict, tool_shed_repository, t
         rd = rrda.repository_dependency
         r = rd.repository
         if can_eliminate_repository_dependency(metadata_dict, tool_shed_url, r.name, r.owner):
+            message = "Repository dependency %s by owner %s is not required by repository %s, owner %s, "
+            message += "removing from list of repository dependencies."
+            log.debug(message % (r.name, r.owner, tool_shed_repository.name, tool_shed_repository.owner))
             trans.install_model.context.delete(rrda)
             trans.install_model.context.flush()
     for td in tool_shed_repository.tool_dependencies:
         if can_eliminate_tool_dependency(metadata_dict, td.name, td.type, td.version):
+            message = "Tool dependency %s, version %s is not required by repository %s, owner %s, "
+            message += "removing from list of tool dependencies."
+            log.debug(message % (td.name, td.version, tool_shed_repository.name, tool_shed_repository.owner))
             trans.install_model.context.delete(td)
             trans.install_model.context.flush()
 
@@ -248,7 +254,7 @@ def generate_tool_shed_repository_install_dir( repository_clone_url, changeset_r
     tool_shed_url = items[ 0 ]
     repo_path = items[ 1 ]
     tool_shed_url = common_util.remove_port_from_tool_shed_url( tool_shed_url )
-    return common_util.url_join( tool_shed_url, pathspec=[ 'repos', repo_path, changeset_revision ] )
+    return '/'.join( [ tool_shed_url, 'repos', repo_path, changeset_revision ] )
 
 
 def get_absolute_path_to_file_in_repository( repo_files_dir, file_name ):
@@ -295,7 +301,7 @@ def get_ctx_rev( app, tool_shed_url, name, owner, changeset_revision ):
     tool_shed_url = common_util.get_tool_shed_url_from_tool_shed_registry( app, tool_shed_url )
     params = dict( name=name, owner=owner, changeset_revision=changeset_revision )
     pathspec = [ 'repository', 'get_ctx_rev' ]
-    ctx_rev = common_util.tool_shed_get( app, tool_shed_url, pathspec=pathspec, params=params )
+    ctx_rev = util.url_get( tool_shed_url, password_mgr=app.tool_shed_registry.url_auth( tool_shed_url ), pathspec=pathspec, params=params )
     return ctx_rev
 
 
@@ -341,7 +347,9 @@ def get_ids_of_tool_shed_repositories_being_installed( app, as_string=False ):
     return installing_repository_ids
 
 
-def get_latest_downloadable_changeset_revision( app, repository, repo ):
+def get_latest_downloadable_changeset_revision( app, repository, repo=None ):
+    if repo is None:
+        repo = hg_util.get_repo_for_repository( app, repository=repository, repo_path=None, create=False )
     repository_tip = repository.tip( app )
     repository_metadata = get_repository_metadata_by_changeset_revision( app, app.security.encode_id( repository.id ), repository_tip )
     if repository_metadata and repository_metadata.downloadable:
@@ -361,8 +369,23 @@ def get_tool_dependency_definition_metadata_from_tool_shed( app, tool_shed_url, 
     tool_shed_url = common_util.get_tool_shed_url_from_tool_shed_registry( app, tool_shed_url )
     params = dict( name=name, owner=owner )
     pathspec = [ 'repository', 'get_tool_dependency_definition_metadata' ]
-    metadata = common_util.tool_shed_get( app, tool_shed_url, pathspec=pathspec, params=params )
+    metadata = util.url_get( tool_shed_url, password_mgr=app.tool_shed_registry.url_auth( tool_shed_url ), pathspec=pathspec, params=params )
     return metadata
+
+
+def get_metadata_changeset_revisions( repository, repo ):
+    """
+    Return an unordered list of changeset_revisions and changeset numbers that are defined as installable.
+    """
+    changeset_tups = []
+    for repository_metadata in repository.downloadable_revisions:
+        ctx = hg_util.get_changectx_for_changeset( repo, repository_metadata.changeset_revision )
+        if ctx:
+            rev = ctx.rev()
+        else:
+            rev = -1
+        changeset_tups.append( ( rev, repository_metadata.changeset_revision ) )
+    return sorted( changeset_tups )
 
 
 def get_next_downloadable_changeset_revision( repository, repo, after_changeset_revision ):
@@ -477,6 +500,22 @@ def get_repo_info_tuple_contents( repo_info_tuple ):
     return description, repository_clone_url, changeset_revision, ctx_rev, repository_owner, repository_dependencies, tool_dependencies
 
 
+def get_repositories_by_category( app, category_id ):
+    sa_session = app.model.context.current
+    resultset = sa_session.query( app.model.Category ).get( category_id )
+    repositories = []
+    default_value_mapper = { 'id': app.security.encode_id, 'user_id': app.security.encode_id }
+    for row in resultset.repositories:
+        repository_dict = row.repository.to_dict( value_mapper=default_value_mapper )
+        repository_dict[ 'metadata' ] = {}
+        for changeset, changehash in row.repository.installable_revisions( app ):
+            encoded_id = app.security.encode_id( row.repository.id )
+            metadata = get_repository_metadata_by_changeset_revision( app, encoded_id, changehash )
+            repository_dict[ 'metadata' ][ '%s:%s' % ( changeset, changehash ) ] = metadata.to_dict( value_mapper=default_value_mapper )
+        repositories.append( repository_dict )
+    return repositories
+
+
 def get_repository_and_repository_dependencies_from_repo_info_dict( app, repo_info_dict ):
     """Return a tool_shed_repository or repository record defined by the information in the received repo_info_dict."""
     repository_name = repo_info_dict.keys()[ 0 ]
@@ -587,7 +626,7 @@ def get_repository_for_dependency_relationship( app, tool_shed, name, owner, cha
         tool_shed_url = common_util.get_tool_shed_url_from_tool_shed_registry( app, tool_shed )
         params = dict( name=name, owner=owner, changeset_revision=changeset_revision )
         pathspec = [ 'repository', 'next_installable_changeset_revision' ]
-        text = common_util.tool_shed_get( app, tool_shed_url, pathspec=pathspec, params=params )
+        text = util.url_get( tool_shed_url, password_mgr=app.tool_shed_registry.url_auth( tool_shed_url ), pathspec=pathspec, params=params )
         if text:
             repository = get_installed_repository( app=app,
                                                    tool_shed=tool_shed,
@@ -597,9 +636,17 @@ def get_repository_for_dependency_relationship( app, tool_shed, name, owner, cha
     return repository
 
 
-def get_repository_file_contents( file_path ):
+def get_repository_file_contents( app, file_path, repository_id, is_admin=False ):
     """Return the display-safe contents of a repository file for display in a browser."""
-    if checkers.is_gzip( file_path ):
+    safe_str = ''
+    if not is_path_browsable( app, file_path, repository_id, is_admin ):
+        log.warning( 'Request tries to access a file outside of the repository location. File path: %s', file_path )
+        return 'Invalid file path'
+    # Symlink targets are checked by is_path_browsable
+    if os.path.islink( file_path ):
+        safe_str = 'link to: ' + basic_util.to_html_string( os.readlink( file_path ) )
+        return safe_str
+    elif checkers.is_gzip( file_path ):
         return '<br/>gzip compressed file<br/>'
     elif checkers.is_bz2( file_path ):
         return '<br/>bz2 compressed file<br/>'
@@ -608,7 +655,6 @@ def get_repository_file_contents( file_path ):
     elif checkers.check_binary( file_path ):
         return '<br/>Binary file<br/>'
     else:
-        safe_str = ''
         for i, line in enumerate( open( file_path ) ):
             safe_str = '%s%s' % ( safe_str, basic_util.to_html_string( line ) )
             # Stop reading after string is larger than MAX_CONTENT_SIZE.
@@ -618,6 +664,7 @@ def get_repository_file_contents( file_path ):
                     util.nice_size( MAX_CONTENT_SIZE )
                 safe_str = '%s%s' % ( safe_str, large_str )
                 break
+
         if len( safe_str ) > basic_util.MAX_DISPLAY_SIZE:
             # Eliminate the middle of the file to display a file no larger than basic_util.MAX_DISPLAY_SIZE.
             # This may not be ideal if the file is larger than MAX_CONTENT_SIZE.
@@ -639,9 +686,6 @@ def get_repository_files( folder_path ):
         # Skip .hg directories
         if item.startswith( '.hg' ):
             continue
-        if os.path.isdir( os.path.join( folder_path, item ) ):
-            # Append a '/' character so that our jquery dynatree will function properly.
-            item = '%s/' % item
         contents.append( item )
     if contents:
         contents.sort()
@@ -784,7 +828,7 @@ def get_repository_type_from_tool_shed( app, tool_shed_url, name, owner ):
     tool_shed_url = common_util.get_tool_shed_url_from_tool_shed_registry( app, tool_shed_url )
     params = dict( name=name, owner=owner )
     pathspec = [ 'repository', 'get_repository_type' ]
-    repository_type = common_util.tool_shed_get( app, tool_shed_url, pathspec=pathspec, params=params )
+    repository_type = util.url_get( tool_shed_url, password_mgr=app.tool_shed_registry.url_auth( tool_shed_url ), pathspec=pathspec, params=params )
     return repository_type
 
 
@@ -870,7 +914,7 @@ def get_tool_shed_status_for_installed_repository( app, repository ):
     params = dict( name=repository.name, owner=repository.owner, changeset_revision=repository.changeset_revision )
     pathspec = [ 'repository', 'status_for_installed_repository' ]
     try:
-        encoded_tool_shed_status_dict = common_util.tool_shed_get( app, tool_shed_url, pathspec=pathspec, params=params )
+        encoded_tool_shed_status_dict = util.url_get( tool_shed_url, password_mgr=app.tool_shed_registry.url_auth( tool_shed_url ), pathspec=pathspec, params=params )
         tool_shed_status_dict = encoding_util.tool_shed_decode( encoded_tool_shed_status_dict )
         return tool_shed_status_dict
     except HTTPError, e:
@@ -882,7 +926,7 @@ def get_tool_shed_status_for_installed_repository( app, repository ):
         params[ 'from_update_manager' ] = True
         try:
             # The value of text will be 'true' or 'false', depending upon whether there is an update available for the installed revision.
-            text = common_util.tool_shed_get( app, tool_shed_url, pathspec=pathspec, params=params )
+            text = util.url_get( tool_shed_url, password_mgr=app.tool_shed_registry.url_auth( tool_shed_url ), pathspec=pathspec, params=params )
             return dict( revision_update=text )
         except Exception, e:
             # The required tool shed may be unavailable, so default the revision_update value to 'false'.
@@ -977,7 +1021,7 @@ def get_updated_changeset_revisions_from_tool_shed( app, tool_shed_url, name, ow
         raise Exception( message )
     params = dict( name=name, owner=owner, changeset_revision=changeset_revision )
     pathspec = [ 'repository', 'updated_changeset_revisions' ]
-    text = common_util.tool_shed_get( app, tool_shed_url, pathspec=pathspec, params=params )
+    text = util.url_get( tool_shed_url, password_mgr=app.tool_shed_registry.url_auth( tool_shed_url ), pathspec=pathspec, params=params )
     return text
 
 
@@ -1106,11 +1150,14 @@ def is_tool_shed_client( app ):
     return hasattr( app, "install_model" )
 
 
-def open_repository_files_folder( folder_path ):
+def open_repository_files_folder( app, folder_path, repository_id, is_admin=False ):
     """
     Return a list of dictionaries, each of which contains information for a file or directory contained
     within a directory in a repository file hierarchy.
     """
+    if not is_path_browsable( app, folder_path, repository_id, is_admin ):
+        log.warning( 'Request tries to access a folder outside of the allowed locations. Folder path: %s', folder_path )
+        return []
     try:
         files_list = get_repository_files( folder_path )
     except OSError, e:
@@ -1120,10 +1167,17 @@ def open_repository_files_folder( folder_path ):
     folder_contents = []
     for filename in files_list:
         is_folder = False
-        if filename and filename[ -1 ] == os.sep:
-            is_folder = True
+        full_path = os.path.join( folder_path, filename )
+        is_link = os.path.islink( full_path )
+        path_is_browsable = is_path_browsable( app, full_path, repository_id )
+        if is_link and not path_is_browsable:
+            log.warning( 'Valid folder contains a symlink outside of the repository location. Link found in: ' + str( full_path ) )
         if filename:
-            full_path = os.path.join( folder_path, filename )
+            if os.path.isdir( full_path ) and path_is_browsable:
+                # Append a '/' character so that our jquery dynatree will function properly.
+                filename = '%s/' % filename
+                full_path = '%s/' % full_path
+                is_folder = True
             node = { "title": filename,
                      "isFolder": is_folder,
                      "isLazy": is_folder,
@@ -1131,6 +1185,41 @@ def open_repository_files_folder( folder_path ):
                      "key": full_path }
             folder_contents.append( node )
     return folder_contents
+
+
+def is_path_browsable( app, path, repository_id, is_admin=False ):
+    """
+    Detects whether the given path is browsable i.e. is within the
+    allowed repository folders. Admins can additionaly browse folders
+    with tool dependencies.
+    """
+    if is_admin and is_path_within_dependency_dir( app, path ):
+        return True
+    return is_path_within_repo( app, path, repository_id)
+
+
+def is_path_within_repo( app, path, repository_id ):
+    """
+    Detect whether the given path is within the repository folder on the disk.
+    Use to filter malicious symlinks targeting outside paths.
+    """
+    repo_path = os.path.abspath( get_repository_by_id( app, repository_id ).repo_path( app ) )
+    resolved_path = os.path.realpath( path )
+    return os.path.commonprefix( [ repo_path, resolved_path ] ) == repo_path
+
+
+def is_path_within_dependency_dir( app, path ):
+    """
+    Detect whether the given path is within the tool_dependency_dir folder on the disk.
+    (Specified by the config option). Use to filter malicious symlinks targeting outside paths.
+    """
+    allowed = False
+    resolved_path = os.path.realpath( path )
+    tool_dependency_dir = app.config.get( 'tool_dependency_dir', None )
+    if tool_dependency_dir:
+        dependency_path = os.path.abspath( tool_dependency_dir )
+        allowed = os.path.commonprefix( [ dependency_path, resolved_path ] ) == dependency_path
+    return allowed
 
 
 def repository_was_previously_installed( app, tool_shed_url, repository_name, repo_info_tuple, from_tip=False ):
@@ -1162,7 +1251,7 @@ def repository_was_previously_installed( app, tool_shed_url, repository_name, re
                    changeset_revision=changeset_revision,
                    from_tip=str( from_tip ) )
     pathspec = [ 'repository', 'previous_changeset_revisions' ]
-    text = common_util.tool_shed_get( app, tool_shed_url, pathspec=pathspec, params=params )
+    text = util.url_get( tool_shed_url, password_mgr=app.tool_shed_registry.url_auth( tool_shed_url ), pathspec=pathspec, params=params )
     if text:
         changeset_revisions = util.listify( text )
         for previous_changeset_revision in changeset_revisions:

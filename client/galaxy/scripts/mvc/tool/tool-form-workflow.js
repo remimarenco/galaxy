@@ -49,10 +49,10 @@ define(['utils/utils', 'mvc/tool/tool-form-base'],
                 if ( input.type ) {
                     if ( [ 'data', 'data_collection' ].indexOf( input.type ) != -1 ) {
                         input.type = 'hidden';
-                        input.info = 'Data input \'' + input.name + '\' (' + Utils.textify( input.extensions && input.extensions.toString() ) + ')';
-                        input.value = null;
+                        input.info = 'Data input \'' + input.name + '\' (' + Utils.textify( input.extensions ) + ')';
+                        input.value = { '__class__': 'RuntimeValue' };
                     } else {
-                        input.collapsible_value = {'__class__': 'RuntimeValue'};
+                        input.collapsible_value = { '__class__': 'RuntimeValue' };
                         input.is_workflow = ( input.options && input.options.length == 0 ) ||
                                             ( [ 'integer', 'float' ].indexOf( input.type ) != -1 );
                     }
@@ -98,7 +98,7 @@ define(['utils/utils', 'mvc/tool/tool-form-base'],
                     type        : 'boolean',
                     value       : String(Boolean(this.post_job_actions['EmailAction' + output_id])),
                     ignore      : 'false',
-                    help        : 'An email notification will be send when the job has completed.',
+                    help        : 'An email notification will be sent when the job has completed.',
                     payload     : {
                         'host'  : window.location.host
                     }

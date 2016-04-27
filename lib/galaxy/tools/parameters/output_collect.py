@@ -9,7 +9,11 @@ import json
 from galaxy import jobs
 from galaxy import util
 from galaxy.util import odict
-from galaxy.tools.parser.output_collection_def import DEFAULT_DATASET_COLLECTOR_DESCRIPTION
+from galaxy.util import ExecutionTimer
+from galaxy.tools.parser.output_collection_def import (
+    DEFAULT_DATASET_COLLECTOR_DESCRIPTION,
+    INPUT_DBKEY_TOKEN,
+)
 
 DATASET_ID_TOKEN = "DATASET_ID"
 
@@ -24,6 +28,7 @@ def collect_dynamic_collections(
     job_working_directory,
     inp_data={},
     job=None,
+    input_dbkey="?",
 ):
     collections_service = tool.app.dataset_collections_service
     job_context = JobContext(
@@ -31,6 +36,7 @@ def collect_dynamic_collections(
         job,
         job_working_directory,
         inp_data,
+        input_dbkey,
     )
 
     for name, has_collection in output_collections.items():
@@ -64,8 +70,9 @@ def collect_dynamic_collections(
 
 class JobContext( object ):
 
-    def __init__( self, tool, job, job_working_directory, inp_data ):
+    def __init__( self, tool, job, job_working_directory, inp_data, input_dbkey ):
         self.inp_data = inp_data
+        self.input_dbkey = input_dbkey
         self.app = tool.app
         self.sa_session = tool.sa_session
         self.job = job
@@ -97,18 +104,20 @@ class JobContext( object ):
         dataset_collectors = map(dataset_collector, output_collection_def.dataset_collector_descriptions)
         filenames = self.find_files( collection, dataset_collectors )
 
+        element_datasets = []
         for filename, extra_file_collector in filenames.iteritems():
+            create_dataset_timer = ExecutionTimer()
             fields_match = extra_file_collector.match( collection, os.path.basename( filename ) )
             if not fields_match:
                 raise Exception( "Problem parsing metadata fields for file %s" % filename )
             element_identifiers = fields_match.element_identifiers
-            current_builder = root_collection_builder
-            for element_identifier in element_identifiers[:-1]:
-                current_builder = current_builder.get_level(element_identifier)
             designation = fields_match.designation
             visible = fields_match.visible
             ext = fields_match.ext
             dbkey = fields_match.dbkey
+            if dbkey == INPUT_DBKEY_TOKEN:
+                dbkey = self.input_dbkey
+
             # Create new primary dataset
             name = fields_match.name or designation
 
@@ -121,7 +130,47 @@ class JobContext( object ):
                 filename=filename,
                 metadata_source_name=output_collection_def.metadata_source,
             )
+            log.debug(
+                "(%s) Created dynamic collection dataset for path [%s] with element identifier [%s] for output [%s] %s",
+                self.job.id,
+                filename,
+                designation,
+                output_collection_def.name,
+                create_dataset_timer,
+            )
+            element_datasets.append((element_identifiers, dataset))
+
+        app = self.app
+        sa_session = self.sa_session
+        job = self.job
+
+        if job:
+            add_datasets_timer = ExecutionTimer()
+            job.history.add_datasets(sa_session, [d for (ei, d) in element_datasets])
+            log.debug(
+                "(%s) Add dynamic collection datsets to history for output [%s] %s",
+                self.job.id,
+                output_collection_def.name,
+                add_datasets_timer,
+            )
+
+        for (element_identifiers, dataset) in element_datasets:
+            current_builder = root_collection_builder
+            for element_identifier in element_identifiers[:-1]:
+                current_builder = current_builder.get_level(element_identifier)
             current_builder.add_dataset( element_identifiers[-1], dataset )
+
+            # Associate new dataset with job
+            if job:
+                element_identifier_str = ":".join(element_identifiers)
+                # Below was changed from '__new_primary_file_%s|%s__' % ( name, designation )
+                assoc = app.model.JobToOutputDatasetAssociation( '__new_primary_file_%s|%s__' % ( name, element_identifier_str ), dataset )
+                assoc.job = self.job
+            sa_session.add( assoc )
+
+            dataset.raw_set_dataset_state('ok')
+
+        sa_session.flush()
 
     def create_dataset(
         self,
@@ -136,20 +185,13 @@ class JobContext( object ):
         app = self.app
         sa_session = self.sa_session
 
+        primary_data = _new_hda(app, sa_session, ext, designation, visible, dbkey, self.permissions)
+
         # Copy metadata from one of the inputs if requested.
         metadata_source = None
         if metadata_source_name:
             metadata_source = self.inp_data[ metadata_source_name ]
 
-        # Create new primary dataset
-        primary_data = app.model.HistoryDatasetAssociation( extension=ext,
-                                                            designation=designation,
-                                                            visible=visible,
-                                                            dbkey=dbkey,
-                                                            create_dataset=True,
-                                                            sa_session=sa_session )
-        app.security_agent.set_all_dataset_permissions( primary_data.dataset, self.permissions )
-        sa_session.add( primary_data )
         sa_session.flush()
         # Move data from temp location to dataset location
         app.object_store.update_from_file(primary_data.dataset, file_name=filename, create=True)
@@ -163,25 +205,20 @@ class JobContext( object ):
         else:
             primary_data.init_meta()
 
-        # Associate new dataset with job
-        if self.job:
-            self.job.history.add_dataset( primary_data )
-
-            assoc = app.model.JobToOutputDatasetAssociation( '__new_primary_file_%s|%s__' % ( name, designation ), primary_data )
-            assoc.job = self.job
-            sa_session.add( assoc )
-            sa_session.flush()
-
-        primary_data.state = 'ok'
         return primary_data
 
 
-def collect_primary_datasets( tool, output, job_working_directory, input_ext ):
+def collect_primary_datasets( tool, output, job_working_directory, input_ext, input_dbkey="?" ):
     app = tool.app
     sa_session = tool.sa_session
     new_primary_datasets = {}
     try:
-        json_file = open( os.path.join( job_working_directory, jobs.TOOL_PROVIDED_JOB_METADATA_FILE ), 'r' )
+        galaxy_json_path = os.path.join( job_working_directory, "working", jobs.TOOL_PROVIDED_JOB_METADATA_FILE )
+        # LEGACY: Remove in 17.XX
+        if not os.path.exists( galaxy_json_path ):
+            # Maybe this is a legacy job, use the job working directory instead
+            galaxy_json_path = os.path.join( job_working_directory, jobs.TOOL_PROVIDED_JOB_METADATA_FILE )
+        json_file = open( galaxy_json_path, 'r' )
         for line in json_file:
             line = json.loads( line )
             if line.get( 'type' ) == 'new_primary_dataset':
@@ -227,15 +264,11 @@ def collect_primary_datasets( tool, output, job_working_directory, input_ext ):
             if ext == "input":
                 ext = input_ext
             dbkey = fields_match.dbkey
+            if dbkey == INPUT_DBKEY_TOKEN:
+                dbkey = input_dbkey
             # Create new primary dataset
-            primary_data = app.model.HistoryDatasetAssociation( extension=ext,
-                                                                designation=designation,
-                                                                visible=visible,
-                                                                dbkey=dbkey,
-                                                                create_dataset=True,
-                                                                sa_session=sa_session )
+            primary_data = _new_hda(app, sa_session, ext, designation, visible, dbkey)
             app.security_agent.copy_dataset_permissions( outdata.dataset, primary_data.dataset )
-            sa_session.add( primary_data )
             sa_session.flush()
             # Move data from temp location to dataset location
             app.object_store.update_from_file(primary_data.dataset, file_name=filename, create=True)
@@ -458,6 +491,33 @@ class CollectedDatasetMatch( object ):
             return self.re_match.group( "visible" ).lower() == "visible"
         except IndexError:
             return self.collector.default_visible
+
+UNSET = object()
+
+
+def _new_hda(
+    app,
+    sa_session,
+    ext,
+    designation,
+    visible,
+    dbkey,
+    permissions=UNSET,
+):
+    """Return a new unflushed HDA with dataset and permissions setup.
+    """
+    # Create new primary dataset
+    primary_data = app.model.HistoryDatasetAssociation( extension=ext,
+                                                        designation=designation,
+                                                        visible=visible,
+                                                        dbkey=dbkey,
+                                                        create_dataset=True,
+                                                        flush=False,
+                                                        sa_session=sa_session )
+    if permissions is not UNSET:
+        app.security_agent.set_all_dataset_permissions( primary_data.dataset, permissions, new=True, flush=False )
+    sa_session.add( primary_data )
+    return primary_data
 
 
 DEFAULT_DATASET_COLLECTOR = DatasetCollector(DEFAULT_DATASET_COLLECTOR_DESCRIPTION)
