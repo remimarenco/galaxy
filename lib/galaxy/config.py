@@ -91,7 +91,6 @@ class Configuration( object ):
         self.tool_data_path = resolve_path( kwargs.get( "tool_data_path", "tool-data" ), os.getcwd() )
         self.builds_file_path = resolve_path( kwargs.get( "builds_file_path", os.path.join( self.tool_data_path, 'shared', 'ucsc', 'builds.txt') ), self.root )
         self.len_file_path = resolve_path( kwargs.get( "len_file_path", os.path.join( self.tool_data_path, 'shared', 'ucsc', 'chrom') ), self.root )
-        self.test_conf = resolve_path( kwargs.get( "test_conf", "" ), self.root )
         # The value of migrated_tools_config is the file reserved for containing only those tools that have been eliminated from the distribution
         # and moved to the tool shed.
         self.integrated_tool_panel_config = resolve_path( kwargs.get( 'integrated_tool_panel_config', 'integrated_tool_panel.xml' ), self.root )
@@ -227,6 +226,9 @@ class Configuration( object ):
         self.commands_in_new_shell = string_as_bool( kwargs.get( 'enable_beta_tool_command_isolation', "True" ) )
         self.tool_submission_burst_threads = int( kwargs.get( 'tool_submission_burst_threads', '1' ) )
         self.tool_submission_burst_at = int( kwargs.get( 'tool_submission_burst_at', '10' ) )
+        # Enable new interface for API installations from TS.
+        # Admin menu will list both if enabled.
+        self.enable_beta_ts_api_install = string_as_bool( kwargs.get( 'enable_beta_ts_api_install', 'False' ) )
         # The transfer manager and deferred job queue
         self.enable_beta_job_managers = string_as_bool( kwargs.get( 'enable_beta_job_managers', 'False' ) )
         # These workflow modules should not be considered part of Galaxy's
@@ -452,6 +454,7 @@ class Configuration( object ):
         self.visualization_plugins_directory = kwargs.get(
             'visualization_plugins_directory', 'config/plugins/visualizations' )
         ie_dirs = kwargs.get( 'interactive_environment_plugins_directory', None )
+        self.gie_dirs = [d.strip() for d in (ie_dirs.split(",") if ie_dirs else [])]
         if ie_dirs and not self.visualization_plugins_directory:
             self.visualization_plugins_directory = ie_dirs
         elif ie_dirs:
@@ -464,6 +467,12 @@ class Configuration( object ):
         self.dynamic_proxy_bind_ip = kwargs.get( "dynamic_proxy_bind_ip", "0.0.0.0" )
         self.dynamic_proxy_external_proxy = string_as_bool( kwargs.get( "dynamic_proxy_external_proxy", "False" ) )
         self.dynamic_proxy_prefix = kwargs.get( "dynamic_proxy_prefix", "gie_proxy" )
+
+        self.dynamic_proxy = kwargs.get( "dynamic_proxy", "node" )
+        self.dynamic_proxy_golang_noaccess = kwargs.get( "dynamic_proxy_golang_noaccess", 60 )
+        self.dynamic_proxy_golang_clean_interval = kwargs.get( "dynamic_proxy_golang_clean_interval", 10 )
+        self.dynamic_proxy_golang_docker_address = kwargs.get( "dynamic_proxy_golang_docker_address", "unix:///var/run/docker.sock" )
+        self.dynamic_proxy_golang_api_key = kwargs.get( "dynamic_proxy_golang_api_key", None )
 
         # Default chunk size for chunkable datatypes -- 64k
         self.display_chunk_size = int( kwargs.get( 'display_chunk_size', 65536) )

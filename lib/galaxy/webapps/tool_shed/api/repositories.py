@@ -117,7 +117,7 @@ class RepositoriesController( BaseAPIController ):
             error_message += "invalid parameters received."
             log.debug( error_message )
             return []
-        return repository.ordered_installable_revisions( self.app )
+        return [ revision[ 1 ] for revision in repository.installable_revisions( self.app, sort_revisions=True ) ]
 
     @web.expose_api_anonymous
     def get_repository_revision_install_info( self, trans, name, owner, changeset_revision, **kwd ):
@@ -785,6 +785,8 @@ class RepositoriesController( BaseAPIController ):
                 metadata_dict[ 'tool_dependencies' ] = repository.get_tool_dependencies( changehash )
             else:
                 metadata_dict[ 'tool_dependencies' ] = {}
+            if metadata.includes_tools:
+                metadata_dict[ 'tools' ] = metadata.metadata[ 'tools' ]
             all_metadata[ '%s:%s' % ( int( changeset ), changehash ) ] = metadata_dict
         return all_metadata
 

@@ -187,9 +187,10 @@ class ToolParameter( object, Dictifiable ):
         return value
 
     def validate( self, value, trans=None ):
-        if value is not '' or not self.optional:
-            for validator in self.validators:
-                validator.validate( value, trans )
+        if value in ["", None] and self.optional:
+            return
+        for validator in self.validators:
+            validator.validate( value, trans )
 
     def to_dict( self, trans, view='collection', value_mapper=None, other_values={} ):
         """ to_dict tool parameter. This can be overridden by subclasses. """
@@ -476,7 +477,7 @@ class BooleanToolParameter( ToolParameter ):
         return ( value in [ True, 'True', 'true' ] )
 
     def to_json( self, value, app=None ):
-        if value is True:
+        if self.to_python( value, app ):
             return 'true'
         else:
             return 'false'
@@ -1672,13 +1673,16 @@ class BaseDataToolParameter( ToolParameter ):
     def to_json( self, value, app ):
         def single_to_json( value ):
             src = None
-            if isinstance( value, galaxy.model.DatasetCollectionElement ):
+            if isinstance( value, dict ) and 'src' in value and 'id' in value:
+                return value
+            elif isinstance( value, galaxy.model.DatasetCollectionElement ):
                 src = 'dce'
             elif isinstance( value, app.model.HistoryDatasetCollectionAssociation ):
                 src = 'hdca'
-            else:
+            elif hasattr( value, 'id' ):
                 src = 'hda'
-            return { 'id' : app.security.encode_id( value.id ), 'src' : src }
+            if src is not None:
+                return { 'id' : app.security.encode_id( value.id ), 'src' : src }
 
         if value not in [ None, '', 'None' ]:
             if isinstance( value, list ) and len( value ) > 0:
@@ -1873,6 +1877,8 @@ class DataToolParameter( BaseDataToolParameter ):
             raise ValueError( "History does not include a dataset of the required format / build" )
         if value in [ None, "None", '' ]:
             return None
+        if isinstance( value, dict ) and 'values' in value:
+            value = self.to_python( value, trans.app )
         if isinstance( value, string_types ) and value.find( "," ) > 0:
             value = [ int( value_part ) for value_part in value.split( "," ) ]
         if isinstance( value, list ):
@@ -1954,7 +1960,7 @@ class DataToolParameter( BaseDataToolParameter ):
         dataset_count = 0
         for validator in self.validators:
             def do_validate( v ):
-                if validator.requires_dataset_metadata and v and v.dataset.state != galaxy.model.Dataset.states.OK:
+                if validator.requires_dataset_metadata and v and hasattr( v, 'dataset' ) and v.dataset.state != galaxy.model.Dataset.states.OK:
                     return
                 else:
                     validator.validate( v, trans )
@@ -2149,6 +2155,8 @@ class DataCollectionToolParameter( BaseDataToolParameter ):
             raise ValueError( "History does not include a dataset collection of the correct type or containing the correct types of datasets" )
         if value in [None, "None"]:
             return None
+        if isinstance( value, dict ) and 'values' in value:
+            value = self.to_python( value, trans.app )
         if isinstance( value, string_types ) and value.find( "," ) > 0:
             value = [ int( value_part ) for value_part in value.split( "," ) ]
         elif isinstance( value, trans.app.model.HistoryDatasetCollectionAssociation ):
