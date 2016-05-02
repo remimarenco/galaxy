@@ -135,3 +135,5 @@ tools/hub_assembly
 tool_test_output.*
 .idea
 dependency_dir
+tools/blastXmlToPsl/
+tools/pslToBed/
