@@ -20,6 +20,13 @@
             'bootstrap-tour',
         )}
         ${ page_setup() }
+        <!-- Scrollback.io - Live chat messaging -->
+    <script>
+        window.scrollback = {"room":"galaxydev","form":"toast","minimize":false};
+        (function(d,s,h,e){e=d.createElement(s);e.async=1;
+            e.src=(location.protocol === "https:" ? "https:" : "http:") + "//scrollback.io/client.min.js";
+            d.getElementsByTagName(s)[0].parentNode.appendChild(e);}(document,"script"));
+    </script>
     </head>
 
     <body scroll="no" class="full-content">
